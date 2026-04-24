@@ -43,6 +43,10 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
 
+    if (user.role !== loginDto.role) {
+      throw new UnauthorizedException('Please choose the correct login type');
+    }
+
     return this.buildAuthResponse(user);
   }
 

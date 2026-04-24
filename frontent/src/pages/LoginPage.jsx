@@ -11,41 +11,46 @@ const loginSchema = Yup.object({
   password: Yup.string()
     .min(6, 'Password must be at least 6 characters')
     .required('Password is required'),
+  role: Yup.string().oneOf(['manager', 'employee']).required('Login type is required'),
 });
 
 export function LoginPage() {
   const dispatch = useAppDispatch();
-  const { isAuthenticated, loading, error } = useAppSelector((state) => state.auth);
+  const { isAuthenticated, loading, error, user } = useAppSelector((state) => state.auth);
 
   if (isAuthenticated) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={user?.role === 'manager' ? '/manager' : '/user'} replace />;
   }
 
   return (
-    <div className="auth-layout">
-      <div className="auth-panel">
-        <div className="auth-copy">
-          <p className="eyebrow">Team Logger Assessment</p>
-          <h1 className="page-title">Welcome back</h1>
-          <p className="page-subtitle">
-            Sign in to manage daily work logs and keep your team updates in one place.
+    <div className="flex min-h-screen items-center justify-center px-5 py-8 md:px-8">
+      <div className="w-full max-w-md rounded-[32px] border border-white/70 bg-[rgba(255,255,255,0.9)] p-8 shadow-[0_18px_45px_rgba(28,50,84,0.12)] backdrop-blur-[14px] md:p-10">
+        <div className="mb-8 text-center">
+          <p className="text-[0.78rem] font-bold uppercase tracking-[0.18em] text-[#0f5cc0]">
+            Team Logger
           </p>
+          <h1 className="mt-3 text-3xl font-semibold text-slate-900 md:text-4xl">Sign in</h1>
+          <p className="mt-2 text-sm text-slate-500">Enter your account details to continue.</p>
         </div>
-      </div>
-
-      <div className="auth-card">
-        <h2>Login</h2>
-        <p className="muted-text">Enter your account details to continue.</p>
 
         <Formik
-          initialValues={{ email: '', password: '' }}
+          initialValues={{ email: '', password: '', role: 'employee' }}
           validationSchema={loginSchema}
           onSubmit={(values) => {
             dispatch(authActions.loginRequest(values));
           }}
         >
-          <Form className="form-layout">
-            <InputField label="Email" name="email" type="email" placeholder="Enter your email" />
+          <Form className="grid gap-5">
+            <InputField label="Login Type" name="role" as="select">
+              <option value="employee">User</option>
+              <option value="manager">Manager</option>
+            </InputField>
+            <InputField
+              label="Email"
+              name="email"
+              type="email"
+              placeholder="Enter your email"
+            />
             <InputField
               label="Password"
               name="password"
@@ -53,17 +58,24 @@ export function LoginPage() {
               placeholder="Enter your password"
             />
 
-            {error ? <div className="alert alert-error">{error}</div> : null}
+            {error ? (
+              <div className="rounded-2xl border border-red-200 bg-red-50 px-3.5 py-3 text-[0.95rem] text-red-700">
+                {error}
+              </div>
+            ) : null}
 
-            <Button disabled={loading} type="submit">
+            <Button className="mt-2 w-full justify-center" disabled={loading} type="submit">
               {loading ? 'Signing in...' : 'Login'}
             </Button>
           </Form>
         </Formik>
 
-        <p className="auth-switch">
-          Don&apos;t have an account? <Link to="/register">Create one</Link>
-        </p>
+        <div className="mt-8 border-t border-slate-200 pt-5 text-center text-sm text-slate-500">
+          Don&apos;t have an account?{' '}
+          <Link className="font-semibold text-[#0f5cc0] no-underline hover:underline" to="/register">
+            Create one
+          </Link>
+        </div>
       </div>
     </div>
   );

@@ -29,14 +29,8 @@ export class UserService implements OnModuleInit {
       {
         name: process.env.DEFAULT_MANAGER_NAME ?? 'Manager User',
         email: process.env.DEFAULT_MANAGER_EMAIL ?? 'manager@teamlogger.com',
-        password: process.env.DEFAULT_MANAGER_PASSWORD ?? 'manager123',
+        password: process.env.DEFAULT_MANAGER_PASSWORD ?? '',
         role: Role.Manager,
-      },
-      {
-        name: process.env.DEFAULT_EMPLOYEE_NAME ?? 'Employee User',
-        email: process.env.DEFAULT_EMPLOYEE_EMAIL ?? 'employee@teamlogger.com',
-        password: process.env.DEFAULT_EMPLOYEE_PASSWORD ?? 'employee123',
-        role: Role.Employee,
       },
     ];
 

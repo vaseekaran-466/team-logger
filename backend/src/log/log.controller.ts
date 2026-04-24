@@ -26,7 +26,7 @@ export class LogController {
   constructor(private readonly logService: LogService) {}
 
   @Post()
-  @Roles(Role.Employee)
+  @Roles(Role.Employee, Role.Manager)
   create(
     @Body() createLogDto: CreateLogDto,
     @CurrentUser() currentUser: CurrentUserData,
@@ -43,7 +43,7 @@ export class LogController {
   }
 
   @Patch(':id')
-  @Roles(Role.Employee)
+  @Roles(Role.Employee, Role.Manager)
   update(
     @Param('id') id: string,
     @Body() updateLogDto: UpdateLogDto,
@@ -53,7 +53,7 @@ export class LogController {
   }
 
   @Delete(':id')
-  @Roles(Role.Employee)
+  @Roles(Role.Employee, Role.Manager)
   remove(@Param('id') id: string, @CurrentUser() currentUser: CurrentUserData) {
     return this.logService.remove(id, currentUser);
   }

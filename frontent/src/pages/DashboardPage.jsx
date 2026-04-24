@@ -12,12 +12,6 @@ import { logActions } from '../features/logs/logSlice';
 import { userActions } from '../features/users/userSlice';
 import { useAppDispatch, useAppSelector } from '../hooks';
 
-const filterSchema = Yup.object({
-  userId: Yup.string(),
-  startDate: Yup.string(),
-  search: Yup.string(),
-});
-
 const logSchema = Yup.object({
   date: Yup.string().required('Date is required'),
   workDescription: Yup.string().required('Work description is required'),
@@ -31,24 +25,30 @@ const defaultLogValues = {
   date: '',
   workDescription: '',
   hoursWorked: 8,
+  userId: '',
 };
+
+const glassCardClass =
+  'rounded-3xl border border-white/70 bg-[rgba(255,255,255,0.88)] p-8 shadow-[0_18px_45px_rgba(28,50,84,0.12)] backdrop-blur-[10px]';
 
 export function DashboardPage() {
   const dispatch = useAppDispatch();
   const { user } = useAppSelector((state) => state.auth);
   const logsState = useAppSelector((state) => state.logs);
   const usersState = useAppSelector((state) => state.users);
+  const [userSearch, setUserSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingLog, setEditingLog] = useState(null);
   const role = user?.role;
   const isManager = role === 'manager';
-  const canCreateLogs = role === 'user' || role === 'employee';
-  const canUseSearchFilter = isManager || canCreateLogs;
-  const panelLabel = isManager ? 'Manager Panel' : canCreateLogs ? 'User Panel' : 'Log Viewer';
+  const isUser = role === 'employee';
+  const canCreateLogs = isManager;
+  const canManageLog = (log) => isManager || log.user?._id === user.id || log.user?.id === user.id;
+  const panelLabel = isManager ? 'Manager Panel' : isUser ? 'User Panel' : 'Log Viewer';
   const subtitle = isManager
-    ? 'Review all team logs and filter work records.'
-    : canCreateLogs
-      ? 'Create, update, and manage your daily work logs.'
+    ? 'Create and manage logs from the manager workspace.'
+    : isUser
+      ? 'View your work logs from the user workspace.'
       : 'View work logs with read-only access.';
 
   useEffect(() => {
@@ -64,17 +64,28 @@ export function DashboardPage() {
     [logsState.items],
   );
 
+  const userSearchTerm = userSearch.trim().toLowerCase();
+  const displayedLogs = useMemo(() => {
+    if (!isManager || !userSearchTerm) {
+      return logsState.items;
+    }
+
+    return logsState.items.filter((log) => {
+      const name = (log.user?.name ?? '').toLowerCase();
+      const email = (log.user?.email ?? '').toLowerCase();
+      return name.includes(userSearchTerm) || email.includes(userSearchTerm);
+    });
+  }, [isManager, logsState.items, userSearchTerm]);
+
+  const getUserId = (item) => item?._id ?? item?.id ?? '';
+  const getUserLabel = (item) => (item?.email ? `${item.name} (${item.email})` : item?.name ?? '');
+
   const currentMonthHours = useMemo(() => {
-
-const month = new Date().getMonth();
-
-  const year = new Date().getFullYear();
-
+    const month = new Date().getMonth();
+    const year = new Date().getFullYear();
     return logsState.items.reduce((total, log) => {
-
       const logDate = new Date(log.date);
       if (logDate.getMonth() === month && logDate.getFullYear() === year) {
-
         return total + Number(log.hoursWorked || 0);
       }
       return total;
@@ -123,19 +134,31 @@ const month = new Date().getMonth();
         date: editingLog.date.slice(0, 10),
         workDescription: editingLog.workDescription,
         hoursWorked: editingLog.hoursWorked,
+        userId: editingLog.user?._id ?? editingLog.user?.id ?? '',
       }
     : defaultLogValues;
 
+  const modalLogSchema =
+    isManager && !editingLog
+      ? logSchema.shape({
+          userId: Yup.string().required('User is required'),
+        })
+      : logSchema;
+
   return (
-    <div className="dashboard-layout">
-      <header className="dashboard-header">
+    <div className="min-h-screen p-5 md:p-8">
+      <header className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
         <div>
-          <p className="eyebrow">{panelLabel}</p>
-          <h1 className="page-title">Welcome, {user.name}</h1>
-          <p className="page-subtitle">{subtitle}</p>
+          <p className="m-0 text-[0.78rem] font-bold uppercase tracking-[0.18em] text-[#0f5cc0]">
+            {panelLabel}
+          </p>
+          <h1 className="my-2 mb-3 text-[clamp(2rem,4vw,3.4rem)] leading-[1.1] text-slate-900">
+            Welcome, {user.name}
+          </h1>
+          <p className="text-slate-500">{subtitle}</p>
         </div>
 
-        <div className="header-actions">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center">
           <Button variant="secondary" onClick={() => dispatch(authActions.logout())}>
             Logout
           </Button>
@@ -145,89 +168,67 @@ const month = new Date().getMonth();
         </div>
       </header>
 
-      <section className="stats-grid">
-        <div className="stat-card">
-          <span>Total Logs</span>
-          <strong>{logsState.items.length}</strong>
+      <section className="mt-6 grid gap-6 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
+        <div className={`${glassCardClass} p-6`}>
+          <span className="block text-slate-500">Total Logs</span>
+          <strong className="mt-2.5 block text-[2rem]">{logsState.items.length}</strong>
         </div>
-        <div className="stat-card">
-          <span>Total Hours</span>
-          <strong>{totalHours}</strong>
+        <div className={`${glassCardClass} p-6`}>
+          <span className="block text-slate-500">Total Hours</span>
+          <strong className="mt-2.5 block text-[2rem]">{totalHours}</strong>
         </div>
-        <div className="stat-card">
-          <span>This Month</span>
-          <strong>{currentMonthHours}</strong>
+        <div className={`${glassCardClass} p-6`}>
+          <span className="block text-slate-500">This Month</span>
+          <strong className="mt-2.5 block text-[2rem]">{currentMonthHours}</strong>
         </div>
       </section>
 
-      <section className="content-grid">
-        <div className="panel-card">
-          <div className="panel-heading">
-            <h2>Filter Logs</h2>
+      <section className="mt-6 grid grid-cols-1 gap-6">
+        {isManager ? (
+          <div className={glassCardClass}>
+            <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
+              <div className="w-full md:max-w-md">
+                <label className="mb-2 block font-semibold text-slate-900" htmlFor="userSearch">
+                  User Search
+                </label>
+                <input
+                  id="userSearch"
+                  type="text"
+                  className="h-11 w-full rounded-2xl border border-[#d7deea] bg-white px-3.5 text-sm outline-none transition-shadow duration-200 focus:border-[#0f5cc0] focus:shadow-[0_0_0_4px_rgba(15,92,192,0.12)]"
+                  placeholder="Search by name or email"
+                  value={userSearch}
+                  onChange={(event) => setUserSearch(event.target.value)}
+                />
+              </div>
+
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  setUserSearch('');
+                }}
+              >
+                Clear
+              </Button>
+            </div>
+
+            {logsState.error ? (
+              <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-3.5 py-3 text-[0.95rem] text-red-700">
+                {logsState.error}
+              </div>
+            ) : null}
+            {logsState.successMessage ? (
+              <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-3.5 py-3 text-[0.95rem] text-emerald-700">
+                {logsState.successMessage}
+              </div>
+            ) : null}
           </div>
+        ) : null}
 
-          <Formik
-            initialValues={logsState.filters}
-            enableReinitialize
-            validationSchema={filterSchema}
-            onSubmit={(values) => {
-              dispatch(logActions.fetchLogsRequest(values));
-            }}
-          >
-            {({ resetForm }) => (
-              <Form className="filters-grid">
-                {isManager ? (
-                  <InputField label="User" name="userId" as="select">
-                    <option value="">All users</option>
-                    {usersState.items.map((item) => (
-                      <option key={item._id ?? item.id} value={item._id ?? item.id}>
-                        {item.name}
-                      </option>
-                    ))}
-                  </InputField>
-                ) : null}
-
-                <InputField label="Start Date" name="startDate" type="date" />
-
-                {canUseSearchFilter ? (
-                  <InputField
-                    label="Search"
-                    name="search"
-                    type="text"
-                    placeholder="Search work description"
-                  />
-                ) : null}
-
-                <div className="filter-actions">
-                  <Button type="submit" disabled={logsState.loading}>
-                    {logsState.loading ? 'Loading...' : 'Apply Filter'}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() => {
-                      const nextValues = { userId: '', startDate: '', search: '' };
-                      resetForm({ values: nextValues });
-                      dispatch(logActions.fetchLogsRequest(nextValues));
-                    }}
-                  >
-                    Reset
-                  </Button>
-                </div>
-              </Form>
-            )}
-          </Formik>
-
-          {logsState.error ? <div className="alert alert-error">{logsState.error}</div> : null}
-          {logsState.successMessage ? (
-            <div className="alert alert-success">{logsState.successMessage}</div>
-          ) : null}
-        </div>
-
-        <div className="panel-card">
-          <h2>Log Records</h2>
+        <div className={glassCardClass}>
+          <h2 className="text-xl font-semibold text-slate-900">Log Records</h2>
           <Table
-            data={logsState.items}
+            data={displayedLogs}
             emptyMessage="No logs found for the selected filters."
             columns={[
               {
@@ -254,19 +255,16 @@ const month = new Date().getMonth();
                 key: 'actions',
                 title: 'Actions',
                 render: (row) => (
-                  <div className="table-actions">
-                    {canCreateLogs &&
-                    (row.user?._id === user.id || row.user?.id === user.id) ? (
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    {canManageLog(row) && canCreateLogs ? (
                       <>
-                        <Button variant="secondary" onClick={() => openEditModal(row)}>
-                          Edit
-                        </Button>
-                        <Button variant="danger" onClick={() => handleDelete(row._id)}>
+           <Button variant="secondary" onClick={() => openEditModal(row)}> Edit </Button>
+         <Button variant="danger" onClick={() => handleDelete(row._id)}>
                           Delete
                         </Button>
                       </>
                     ) : (
-                      <span className="muted-text">View only</span>
+                      <span className="text-slate-500">View only</span>
                     )}
                   </div>
                 ),
@@ -284,36 +282,59 @@ const month = new Date().getMonth();
         <Formik
           initialValues={initialLogValues}
           enableReinitialize
-          validationSchema={logSchema}
+          validationSchema={modalLogSchema}
           onSubmit={(values) => {
+            const payload = {
+              date: values.date,
+              workDescription: values.workDescription,
+              hoursWorked: Number(values.hoursWorked),
+              ...(isManager && !editingLog ? { userId: values.userId } : {}),
+            };
+
             dispatch(
               logActions.saveLogRequest({
-                ...values,
-                hoursWorked: Number(values.hoursWorked),
+                ...payload,
                 id: editingLog?._id,
               }),
             );
             closeModal();
           }}
         >
-          <Form className="form-layout">
-            <InputField label="Date" name="date" type="date" />
-            <InputField label="Hours Worked" name="hoursWorked" type="number" />
-            <TextareaField
-              label="Work Description"
-              name="workDescription"
-              placeholder="Describe what was completed today"
-            />
+          {() => {
+            return (
+              <Form className="grid gap-[18px]">
+                {isManager && !editingLog ? (
+                  <>
+                    <InputField label="Assign User" name="userId" as="select">
+                      <option value="">Select a user</option>
+                      {usersState.items.map((item) => (
+                        <option key={getUserId(item)} value={getUserId(item)}>
+                          {getUserLabel(item)}
+                        </option>
+                      ))}
+                    </InputField>
+                  </>
+                ) : null}
 
-            <div className="modal-actions">
-              <Button type="button" variant="secondary" onClick={closeModal}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={logsState.saving}>
-                {logsState.saving ? 'Saving...' : editingLog ? 'Update Log' : 'Create Log'}
-              </Button>
-            </div>
-          </Form>
+                <InputField label="Date" name="date" type="date" />
+                <InputField label="Hours Worked" name="hoursWorked" type="number" />
+                <TextareaField
+                  label="Work Description"
+                  name="workDescription"
+                  placeholder="Describe what was completed today"
+                />
+
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <Button type="button" variant="secondary" onClick={closeModal}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={logsState.saving}>
+                    {logsState.saving ? 'Saving...' : editingLog ? 'Update Log' : 'Create Log'}
+                  </Button>
+                </div>
+              </Form>
+            );
+          }}
         </Formik>
       </Modal>
     </div>

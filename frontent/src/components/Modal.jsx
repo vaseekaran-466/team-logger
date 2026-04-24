@@ -1,24 +1,51 @@
-export function Modal({ isOpen, title, onClose, children }) {
+import { useEffect } from 'react';
 
+export function Modal({ isOpen, title, onClose, children }) {
+  useEffect(() => {
+    if (!isOpen) {
+      return undefined;
+    }
+
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.body.style.overflow = '';
+      window.removeEventListener('keydown', handleEscape);
+    };
+  }, [isOpen, onClose]);
 
   if (!isOpen) {
-
     return null;
   }
 
   return (
-
-    <div className="modal-backdrop" onClick={onClose}>
-
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 p-5"
+      onClick={onClose}
+    >
       <div
-        className="modal-card"
+        className="w-full max-w-[540px] rounded-3xl bg-white p-6 shadow-[0_22px_60px_rgba(0,0,0,0.18)]"
         onClick={(event) => event.stopPropagation()}
         role="dialog"
-        aria-modal="true"  >
-        <div className="modal-header">
-        <h3>{title}</h3>
-          <button className="icon-button" onClick={onClose} type="button">
-            x
+        aria-modal="true"
+        aria-label={title}
+      >
+        <div className="mb-[18px] flex items-center justify-between gap-3">
+          <h3 className="text-xl font-semibold text-slate-900">{title}</h3>
+          <button
+            aria-label="Close modal"
+            className="h-9 w-9 cursor-pointer rounded-full border-0 bg-slate-100 text-slate-700"
+            onClick={onClose}
+            type="button"
+          >
+            X
           </button>
         </div>
         {children}

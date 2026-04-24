@@ -12,20 +12,39 @@ import { CreateLogDto } from './dto/create-log.dto';
 import { FilterLogDto } from './dto/filter-log.dto';
 import { UpdateLogDto } from './dto/update-log.dto';
 import { Log, LogDocument } from './schema/log.schema';
+import { UserService } from '../user/user.service';
 
 @Injectable()
 export class LogService {
-  constructor(@InjectModel(Log.name) private readonly logModel: Model<LogDocument>) {}
+  constructor(
+    @InjectModel(Log.name) private readonly logModel: Model<LogDocument>,
+    private readonly userService: UserService,
+  ) {}
 
-  create(createLogDto: CreateLogDto, currentUser: CurrentUserData) {
+  async create(createLogDto: CreateLogDto, currentUser: CurrentUserData) {
     if (!currentUser?.sub) {
       throw new UnauthorizedException('User not found in token. Please login again');
     }
 
+    const { userId: requestedUserId, ...logData } = createLogDto;
+    let userId = currentUser.sub;
+
+    if (currentUser.role === Role.Manager) {
+      if (requestedUserId) {
+        const selectedUser = await this.userService.findById(requestedUserId);
+
+        if (!selectedUser) {
+          throw new NotFoundException('User not found');
+        }
+
+        userId = requestedUserId;
+      }
+    }
+
     return this.logModel.create({
-      ...createLogDto,
-      date: new Date(createLogDto.date),
-      user: currentUser.sub,
+      ...logData,
+      date: new Date(logData.date),
+      user: userId,
     });
   }
 
