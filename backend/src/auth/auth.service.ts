@@ -19,12 +19,23 @@ export class AuthService {
       role: Role.Employee,
     });
 
-    return this.buildAuthResponse({
-      _id: user._id,
-      name: user.name,
+    const payload = {
+      sub: String(user._id),
       email: user.email,
       role: user.role,
-    });
+      name: user.name,
+    };
+    const accessToken = await this.jwtService.signAsync(payload);
+
+    return {
+      accessToken,
+      user: {
+        id: String(user._id),
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+    };
   }
 
   async login(loginDto: LoginDto) {
@@ -47,31 +58,18 @@ export class AuthService {
       throw new UnauthorizedException('Please choose the correct login type');
     }
 
-    return this.buildAuthResponse(user);
-  }
-
-  private async buildAuthResponse(user: {
-    _id: unknown;
-    name: string;
-    email: string;
-    role: Role;
-  }) {
-    const userId = String(user._id);
-
     const payload = {
-      sub: userId,
+      sub: String(user._id),
       email: user.email,
       role: user.role,
       name: user.name,
     };
+    const accessToken = await this.jwtService.signAsync(payload);
 
     return {
-      accessToken: await this.jwtService.signAsync(payload, {
-        secret: process.env.JWT_SECRET ?? 'team-logger-secret',
-        expiresIn: Number(process.env.JWT_EXPIRES_IN_SECONDS ?? 86400),
-      }),
+      accessToken,
       user: {
-        id: userId,
+        id: String(user._id),
         name: user.name,
         email: user.email,
         role: user.role,

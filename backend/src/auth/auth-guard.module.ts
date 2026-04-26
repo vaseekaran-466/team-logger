@@ -7,6 +7,9 @@ import { RolesGuard } from './guards/role.guards';
   imports: [
     JwtModule.register({
       secret: process.env.JWT_SECRET ?? 'team-logger-secret',
+      signOptions: {
+        expiresIn: '1d',
+      },
     }),
   ],
   providers: [JwtAuthGuard, RolesGuard],

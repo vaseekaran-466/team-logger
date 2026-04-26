@@ -8,7 +8,7 @@ export function TextareaField({
 }) {
   return (
     <div className="flex flex-col gap-2">
-      <label className="font-semibold text-slate-900" htmlFor={name}>
+      <label className="text-sm font-semibold text-slate-800" htmlFor={name}>
         {label}
       </label>
       <Field
@@ -17,9 +17,9 @@ export function TextareaField({
         name={name}
         rows={rows}
         placeholder={placeholder}
-        className="w-full resize-y rounded-2xl border border-[#d7deea] bg-white px-3.5 py-3 outline-none transition-shadow duration-200 focus:border-[#0f5cc0] focus:shadow-[0_0_0_4px_rgba(15,92,192,0.12)]"
+        className="w-full resize-y rounded-2xl border border-[#d8dee6] bg-white px-3.5 py-3 text-slate-900 outline-none transition duration-200 placeholder:text-slate-400 focus:border-[#1f2937] focus:shadow-[0_0_0_4px_rgba(31,41,55,0.08)]"
       />
-      <ErrorMessage component="div" className="text-sm text-[#c23b3b]" name={name} />
+      <ErrorMessage component="div" className="text-sm text-[#b64949]" name={name} />
     </div>
   );
 }

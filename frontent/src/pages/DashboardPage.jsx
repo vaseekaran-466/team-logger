@@ -28,15 +28,13 @@ const defaultLogValues = {
   userId: '',
 };
 
-const glassCardClass =
-  'rounded-3xl border border-white/70 bg-[rgba(255,255,255,0.88)] p-8 shadow-[0_18px_45px_rgba(28,50,84,0.12)] backdrop-blur-[10px]';
-
 export function DashboardPage() {
   const dispatch = useAppDispatch();
   const { user } = useAppSelector((state) => state.auth);
   const logsState = useAppSelector((state) => state.logs);
   const usersState = useAppSelector((state) => state.users);
   const [userSearch, setUserSearch] = useState('');
+  const [startDate, setStartDate] = useState(logsState.filters.startDate ?? '');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingLog, setEditingLog] = useState(null);
   const role = user?.role;
@@ -44,12 +42,8 @@ export function DashboardPage() {
   const isUser = role === 'employee';
   const canCreateLogs = isManager;
   const canManageLog = (log) => isManager || log.user?._id === user.id || log.user?.id === user.id;
-  const panelLabel = isManager ? 'Manager Panel' : isUser ? 'User Panel' : 'Log Viewer';
-  const subtitle = isManager
-    ? 'Create and manage logs from the manager workspace.'
-    : isUser
-      ? 'View your work logs from the user workspace.'
-      : 'View work logs with read-only access.';
+  const panelLabel = isManager ? 'Manager Dashboard' : isUser ? 'Employee Dashboard' : 'Log Viewer';
+  const today = new Date();
 
   useEffect(() => {
     dispatch(logActions.fetchLogsRequest(logsState.filters));
@@ -81,8 +75,8 @@ export function DashboardPage() {
   const getUserLabel = (item) => (item?.email ? `${item.name} (${item.email})` : item?.name ?? '');
 
   const currentMonthHours = useMemo(() => {
-    const month = new Date().getMonth();
-    const year = new Date().getFullYear();
+    const month = today.getMonth();
+    const year = today.getFullYear();
     return logsState.items.reduce((total, log) => {
       const logDate = new Date(log.date);
       if (logDate.getMonth() === month && logDate.getFullYear() === year) {
@@ -92,9 +86,41 @@ export function DashboardPage() {
     }, 0);
   }, [logsState.items]);
 
+  const activeUsers = useMemo(() => {
+    const uniqueUsers = new Set(
+      logsState.items.map((log) => log.user?._id ?? log.user?.id).filter(Boolean),
+    );
+    return uniqueUsers.size;
+  }, [logsState.items]);
+  const latestLog = logsState.items[0];
+  const currentMonthLabel = today.toLocaleDateString(undefined, {
+    month: 'long',
+    year: 'numeric',
+  });
+
   if (!user) {
     return <PageLoader label="Loading dashboard..." />;
   }
+
+  const applyFilters = () => {
+    dispatch(
+      logActions.fetchLogsRequest({
+        ...logsState.filters,
+        startDate,
+      }),
+    );
+  };
+
+  const clearFilters = () => {
+    setUserSearch('');
+    setStartDate('');
+    dispatch(
+      logActions.fetchLogsRequest({
+        ...logsState.filters,
+        startDate: '',
+      }),
+    );
+  };
 
   const closeModal = () => {
     setIsModalOpen(false);
@@ -146,87 +172,124 @@ export function DashboardPage() {
       : logSchema;
 
   return (
-    <div className="min-h-screen p-5 md:p-8">
-      <header className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
-        <div>
-          <p className="m-0 text-[0.78rem] font-bold uppercase tracking-[0.18em] text-[#0f5cc0]">
-            {panelLabel}
+    <div className="dashboard-shell">
+      <section className="dashboard-card overflow-hidden px-6 py-6 md:px-8 md:py-8">
+        <header className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+          <div className="max-w-3xl">
+            <p className="eyebrow">{panelLabel}</p>
+            <h1 className="mt-3 text-[clamp(2rem,4vw,3.2rem)] font-semibold leading-[1.06] text-slate-900">
+              Welcome, {user.name}
+            </h1>
+          </div>
+
+          <div className="flex flex-col gap-3 md:flex-row md:items-center">
+            <Button variant="secondary" onClick={() => dispatch(authActions.logout())}>
+              Logout
+            </Button>
+            {canCreateLogs ? <Button onClick={openCreateModal}>Create Log</Button> : null}
+          </div>
+        </header>
+      </section>
+
+      <section className="mt-6 grid gap-5 [grid-template-columns:repeat(auto-fit,minmax(210px,1fr))]">
+        <div className="dashboard-card stat-card">
+          <span className="stat-label">Total Logs</span>
+          <strong className="mt-3 block text-[2rem] font-semibold text-slate-900">
+            {logsState.items.length}
+          </strong>
+          <p className="mt-2 text-sm text-slate-500">Visible records</p>
+        </div>
+        <div className="dashboard-card stat-card">
+          <span className="stat-label">Total Hours</span>
+          <strong className="mt-3 block text-[2rem] font-semibold text-slate-900">{totalHours}</strong>
+          <p className="mt-2 text-sm text-slate-500">All visible entries</p>
+        </div>
+        <div className="dashboard-card stat-card">
+          <span className="stat-label">This Month</span>
+          <strong className="mt-3 block text-[2rem] font-semibold text-slate-900">
+            {currentMonthHours}h
+          </strong>
+          <p className="mt-2 text-sm text-slate-500">{currentMonthLabel}</p>
+        </div>
+        <div className="dashboard-card stat-card">
+          <span className="stat-label">{isManager ? 'Team Members' : 'Latest Entry'}</span>
+          <strong className="mt-3 block text-[2rem] font-semibold text-slate-900">
+            {isManager ? activeUsers : latestLog ? new Date(latestLog.date).toLocaleDateString() : '-'}
+          </strong>
+          <p className="mt-2 text-sm text-slate-500">
+            {isManager ? 'Visible in current view' : 'Most recent log date'}
           </p>
-          <h1 className="my-2 mb-3 text-[clamp(2rem,4vw,3.4rem)] leading-[1.1] text-slate-900">
-            Welcome, {user.name}
-          </h1>
-          <p className="text-slate-500">{subtitle}</p>
-        </div>
-
-        <div className="flex flex-col gap-3 md:flex-row md:items-center">
-          <Button variant="secondary" onClick={() => dispatch(authActions.logout())}>
-            Logout
-          </Button>
-          {canCreateLogs ? (
-            <Button onClick={openCreateModal}>Create Log</Button>
-          ) : null}
-        </div>
-      </header>
-
-      <section className="mt-6 grid gap-6 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
-        <div className={`${glassCardClass} p-6`}>
-          <span className="block text-slate-500">Total Logs</span>
-          <strong className="mt-2.5 block text-[2rem]">{logsState.items.length}</strong>
-        </div>
-        <div className={`${glassCardClass} p-6`}>
-          <span className="block text-slate-500">Total Hours</span>
-          <strong className="mt-2.5 block text-[2rem]">{totalHours}</strong>
-        </div>
-        <div className={`${glassCardClass} p-6`}>
-          <span className="block text-slate-500">This Month</span>
-          <strong className="mt-2.5 block text-[2rem]">{currentMonthHours}</strong>
         </div>
       </section>
 
       <section className="mt-6 grid grid-cols-1 gap-6">
-        {isManager ? (
-          <div className={glassCardClass}>
-            <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
-              <div className="w-full md:max-w-md">
-                <label className="mb-2 block font-semibold text-slate-900" htmlFor="userSearch">
+        <div className="dashboard-card p-6">
+          <div
+            className={[
+              'dashboard-filter-grid',
+              isManager ? 'dashboard-filter-grid--manager' : 'dashboard-filter-grid--user',
+            ]
+              .join(' ')
+              .trim()}
+          >
+            {isManager ? (
+              <div className="dashboard-filter-field">
+                <label className="dashboard-filter-label" htmlFor="userSearch">
                   User Search
                 </label>
                 <input
                   id="userSearch"
                   type="text"
-                  className="h-11 w-full rounded-2xl border border-[#d7deea] bg-white px-3.5 text-sm outline-none transition-shadow duration-200 focus:border-[#0f5cc0] focus:shadow-[0_0_0_4px_rgba(15,92,192,0.12)]"
+                  className="dashboard-filter-input"
                   placeholder="Search by name or email"
                   value={userSearch}
                   onChange={(event) => setUserSearch(event.target.value)}
                 />
               </div>
+            ) : null}
 
+            <div className="dashboard-filter-field">
+              <label className="dashboard-filter-label" htmlFor="startDate">
+                Date
+              </label>
+              <input
+                id="startDate"
+                type="date"
+                className="dashboard-filter-input"
+                value={startDate}
+                onChange={(event) => setStartDate(event.target.value)}
+              />
+            </div>
+
+            <div className="dashboard-filter-actions">
+              <Button type="button" className="dashboard-filter-button" onClick={applyFilters}>
+                Apply
+              </Button>
               <Button
                 type="button"
                 variant="secondary"
-                onClick={() => {
-                  setUserSearch('');
-                }}
+                className="dashboard-filter-button"
+                onClick={clearFilters}
               >
                 Clear
               </Button>
             </div>
-
-            {logsState.error ? (
-              <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-3.5 py-3 text-[0.95rem] text-red-700">
-                {logsState.error}
-              </div>
-            ) : null}
-            {logsState.successMessage ? (
-              <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-3.5 py-3 text-[0.95rem] text-emerald-700">
-                {logsState.successMessage}
-              </div>
-            ) : null}
           </div>
-        ) : null}
 
-        <div className={glassCardClass}>
-          <h2 className="text-xl font-semibold text-slate-900">Log Records</h2>
+          {logsState.error ? <div className="alert alert-error mt-4">{logsState.error}</div> : null}
+          {logsState.successMessage ? (
+            <div className="alert alert-success mt-4">{logsState.successMessage}</div>
+          ) : null}
+        </div>
+
+        <div className="dashboard-card p-6">
+          <div className="mb-5 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+            <div>
+              <h2 className="section-title">Log Records</h2>
+            </div>
+            {logsState.loading ? <span className="section-copy">Refreshing data...</span> : null}
+          </div>
+
           <Table
             data={displayedLogs}
             emptyMessage="No logs found for the selected filters."
@@ -234,37 +297,54 @@ export function DashboardPage() {
               {
                 key: 'date',
                 title: 'Date',
-                render: (row) => new Date(row.date).toLocaleDateString(),
+                render: (row) => (
+                  <div className="font-semibold text-slate-900">
+                    {new Date(row.date).toLocaleDateString()}
+                  </div>
+                ),
               },
               {
                 key: 'user',
                 title: 'User',
-                render: (row) => row.user?.name ?? '-',
+                render: (row) => (
+                  <div>
+                    <div className="font-semibold text-slate-900">{row.user?.name ?? '-'}</div>
+                    <div className="text-xs text-slate-500">{row.user?.email ?? 'No email available'}</div>
+                  </div>
+                ),
               },
               {
                 key: 'description',
                 title: 'Work Description',
-                render: (row) => row.workDescription,
+                render: (row) => (
+                  <div className="max-w-xl leading-6 text-slate-700">{row.workDescription}</div>
+                ),
               },
               {
                 key: 'hours',
                 title: 'Hours',
-                render: (row) => row.hoursWorked,
+                render: (row) => (
+                  <span className="inline-flex min-w-16 justify-center rounded-full border border-[#d6dfeb] bg-[#f8fbfe] px-3 py-1 text-sm font-semibold text-slate-800">
+                    {row.hoursWorked}h
+                  </span>
+                ),
               },
               {
                 key: 'actions',
                 title: 'Actions',
                 render: (row) => (
-                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center">
                     {canManageLog(row) && canCreateLogs ? (
                       <>
-           <Button variant="secondary" onClick={() => openEditModal(row)}> Edit </Button>
-         <Button variant="danger" onClick={() => handleDelete(row._id)}>
+                        <Button variant="secondary" onClick={() => openEditModal(row)}>
+                          Edit
+                        </Button>
+                        <Button variant="danger" onClick={() => handleDelete(row._id)}>
                           Delete
                         </Button>
                       </>
                     ) : (
-                      <span className="text-slate-500">View only</span>
+                      <span className="text-sm text-slate-500">View only</span>
                     )}
                   </div>
                 ),
@@ -274,11 +354,7 @@ export function DashboardPage() {
         </div>
       </section>
 
-      <Modal
-        isOpen={isModalOpen}
-        title={editingLog ? 'Edit Log' : 'Create Log'}
-        onClose={closeModal}
-      >
+      <Modal isOpen={isModalOpen} title={editingLog ? 'Edit Log' : 'Create Log'} onClose={closeModal}>
         <Formik
           initialValues={initialLogValues}
           enableReinitialize
@@ -300,41 +376,35 @@ export function DashboardPage() {
             closeModal();
           }}
         >
-          {() => {
-            return (
-              <Form className="grid gap-[18px]">
-                {isManager && !editingLog ? (
-                  <>
-                    <InputField label="Assign User" name="userId" as="select">
-                      <option value="">Select a user</option>
-                      {usersState.items.map((item) => (
-                        <option key={getUserId(item)} value={getUserId(item)}>
-                          {getUserLabel(item)}
-                        </option>
-                      ))}
-                    </InputField>
-                  </>
-                ) : null}
+          <Form className="grid gap-[18px]">
+            {isManager && !editingLog ? (
+              <InputField label="Assign User" name="userId" as="select">
+                <option value="">Select a user</option>
+                {usersState.items.map((item) => (
+                  <option key={getUserId(item)} value={getUserId(item)}>
+                    {getUserLabel(item)}
+                  </option>
+                ))}
+              </InputField>
+            ) : null}
 
-                <InputField label="Date" name="date" type="date" />
-                <InputField label="Hours Worked" name="hoursWorked" type="number" />
-                <TextareaField
-                  label="Work Description"
-                  name="workDescription"
-                  placeholder="Describe what was completed today"
-                />
+            <InputField label="Date" name="date" type="date" />
+            <InputField label="Hours Worked" name="hoursWorked" type="number" />
+            <TextareaField
+              label="Work Description"
+              name="workDescription"
+              placeholder="Describe what was completed today"
+            />
 
-                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                  <Button type="button" variant="secondary" onClick={closeModal}>
-                    Cancel
-                  </Button>
-                  <Button type="submit" disabled={logsState.saving}>
-                    {logsState.saving ? 'Saving...' : editingLog ? 'Update Log' : 'Create Log'}
-                  </Button>
-                </div>
-              </Form>
-            );
-          }}
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <Button type="button" variant="secondary" onClick={closeModal}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={logsState.saving}>
+                {logsState.saving ? 'Saving...' : editingLog ? 'Update Log' : 'Create Log'}
+              </Button>
+            </div>
+          </Form>
         </Formik>
       </Modal>
     </div>

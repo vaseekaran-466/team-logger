@@ -11,7 +11,9 @@ import { UserModule } from './user/user.module';
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     MongooseModule.forRoot(
-      process.env.MONGODB_URI ?? 'mongodb://127.0.0.1:27017/team-logger',
+      process.env.MONGO_URI ??
+        process.env.MONGODB_URI ??
+        'mongodb://127.0.0.1:27017/team-logger',
     ),
     AuthModule,
     UserModule,

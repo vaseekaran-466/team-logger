@@ -8,11 +8,11 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Role } from '../common/enums/role.enum';
 import { CurrentUserData } from '../common/interfaces/request.interfaces';
+import { UserService } from '../user/user.service';
 import { CreateLogDto } from './dto/create-log.dto';
 import { FilterLogDto } from './dto/filter-log.dto';
 import { UpdateLogDto } from './dto/update-log.dto';
 import { Log, LogDocument } from './schema/log.schema';
-import { UserService } from '../user/user.service';
 
 @Injectable()
 export class LogService {
@@ -23,39 +23,32 @@ export class LogService {
 
   async create(createLogDto: CreateLogDto, currentUser: CurrentUserData) {
     if (!currentUser?.sub) {
-      throw new UnauthorizedException('User not found in token. Please login again');
+      throw new UnauthorizedException(
+        'User not found in token. Please login again',
+      );
     }
 
-    const { userId: requestedUserId, ...logData } = createLogDto;
     let userId = currentUser.sub;
 
-    if (currentUser.role === Role.Manager) {
-      if (requestedUserId) {
-        const selectedUser = await this.userService.findById(requestedUserId);
+    if (currentUser.role === Role.Manager && createLogDto.userId) {
+      const selectedUser = await this.userService.findById(createLogDto.userId);
 
-        if (!selectedUser) {
-          throw new NotFoundException('User not found');
-        }
-
-        userId = requestedUserId;
+      if (!selectedUser) {
+        throw new NotFoundException('User not found');
       }
+      userId = createLogDto.userId;
     }
 
     return this.logModel.create({
-      ...logData,
-      date: new Date(logData.date),
+      workDescription: createLogDto.workDescription,
+      hoursWorked: createLogDto.hoursWorked,
+      date: new Date(createLogDto.date),
       user: userId,
     });
   }
 
   async findAll(filterDto: FilterLogDto, currentUser: CurrentUserData) {
-    const query: {
-      user?: string;
-      date?: {
-        $gte?: Date;
-        $lte?: Date;
-      };
-    } = {};
+    const query: Record<string, any> = {};
 
     if (currentUser.role === Role.Employee) {
       query.user = currentUser.sub;
@@ -68,20 +61,34 @@ export class LogService {
     if (filterDto.startDate || filterDto.endDate) {
       query.date = {};
 
-      if (filterDto.startDate) {
-        query.date.$gte = new Date(filterDto.startDate);
+      const hasStartDate = Boolean(filterDto.startDate);
+      const hasEndDate = Boolean(filterDto.endDate);
+
+      // If only a YYYY-MM-DD date is provided (no time) and endDate is not set,
+      // treat it as a single-day filter in UTC to avoid timezone off-by-one issues.
+      if (hasStartDate && !hasEndDate && /^\d{4}-\d{2}-\d{2}$/.test(filterDto.startDate!)) {
+        const startOfDayUtc = new Date(`${filterDto.startDate}T00:00:00.000Z`);
+        const nextDayUtc = new Date(startOfDayUtc);
+        nextDayUtc.setUTCDate(nextDayUtc.getUTCDate() + 1);
+
+        query.date.$gte = startOfDayUtc;
+        query.date.$lt = nextDayUtc;
+      } else if (hasStartDate) {
+        query.date.$gte = new Date(filterDto.startDate!);
       }
 
-      if (filterDto.endDate) {
-        query.date.$lte = new Date(filterDto.endDate);
+      if (hasEndDate) {
+        query.date.$lte = new Date(filterDto.endDate!);
       }
     }
 
-    return this.logModel
+    const logs = await this.logModel
       .find(query)
       .populate('user', 'name email role')
       .sort({ date: -1, createdAt: -1 })
       .lean();
+
+    return logs;
   }
 
   async update(
@@ -95,7 +102,12 @@ export class LogService {
       throw new NotFoundException('Log not found');
     }
 
-    this.ensureOwnership(existingLog.user.toString(), currentUser);
+    if (
+      currentUser.role !== Role.Manager &&
+      existingLog.user.toString() !== currentUser.sub
+    ) {
+      throw new ForbiddenException('You can only manage your own logs');
+    }
 
     if (updateLogDto.date) {
       existingLog.date = new Date(updateLogDto.date);
@@ -111,10 +123,12 @@ export class LogService {
 
     await existingLog.save();
 
-    return this.logModel
+    const updatedLog = await this.logModel
       .findById(id)
       .populate('user', 'name email role')
       .lean();
+
+    return updatedLog;
   }
 
   async remove(id: string, currentUser: CurrentUserData) {
@@ -124,19 +138,15 @@ export class LogService {
       throw new NotFoundException('Log not found');
     }
 
-    this.ensureOwnership(existingLog.user.toString(), currentUser);
+    if (
+      currentUser.role !== Role.Manager &&
+      existingLog.user.toString() !== currentUser.sub
+    ) {
+      throw new ForbiddenException('You can only manage your own logs');
+    }
+
     await existingLog.deleteOne();
 
     return { message: 'Log deleted successfully' };
-  }
-
-  private ensureOwnership(logUserId: string, currentUser: CurrentUserData) {
-    if (currentUser.role === Role.Manager) {
-      return;
-    }
-
-    if (logUserId !== currentUser.sub) {
-      throw new ForbiddenException('You can only manage your own logs');
-    }
   }
 }

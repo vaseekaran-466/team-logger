@@ -4,7 +4,13 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  const allowedOrigins = (process.env.FRONTEND_URLS ?? process.env.FRONTEND_URL ?? 'http://localhost:5173')
+
+  const frontendUrls =
+    process.env.FRONTEND_URLS ??
+    process.env.FRONTEND_URL ??
+    'http://localhost:5173';
+
+  const allowedOrigins = frontendUrls
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);
@@ -16,17 +22,20 @@ async function bootstrap() {
         return;
       }
 
-      const isConfiguredOrigin = allowedOrigins.includes(origin);
-      const isLocalhostOrigin = (() => {
-        try {
-          const { hostname } = new URL(origin);
-          return hostname === 'localhost' || hostname === '127.0.0.1';
-        } catch {
-          return false;
-        }
-      })();
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
 
-      callback(null, isConfiguredOrigin || isLocalhostOrigin);
+      try {
+        const url = new URL(origin);
+        const isLocalhost =
+          url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+
+        callback(null, isLocalhost);
+      } catch {
+        callback(null, false);
+      }
     },
     credentials: true,
   });

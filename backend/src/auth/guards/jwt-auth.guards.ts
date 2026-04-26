@@ -26,9 +26,7 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     try {
-      const payload = this.jwtService.verify<JwtPayload>(token, {
-        secret: process.env.JWT_SECRET ?? 'team-logger-secret',
-      });
+      const payload = this.jwtService.verify<JwtPayload>(token);
 
       if (!payload.sub) {
         throw new UnauthorizedException('Invalid token payload. Please login again');

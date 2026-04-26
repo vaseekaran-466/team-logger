@@ -27,11 +27,11 @@ export function Modal({ isOpen, title, onClose, children }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 p-5"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 p-4 backdrop-blur-[3px]"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-[540px] rounded-3xl bg-white p-6 shadow-[0_22px_60px_rgba(0,0,0,0.18)]"
+        className="w-full max-w-[540px] rounded-[24px] border border-[#d6dfeb] bg-white p-6 shadow-[0_24px_60px_rgba(15,23,42,0.14)]"
         onClick={(event) => event.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -41,7 +41,7 @@ export function Modal({ isOpen, title, onClose, children }) {
           <h3 className="text-xl font-semibold text-slate-900">{title}</h3>
           <button
             aria-label="Close modal"
-            className="h-9 w-9 cursor-pointer rounded-full border-0 bg-slate-100 text-slate-700"
+            className="h-9 w-9 cursor-pointer rounded-full border border-[#d6dfeb] bg-[#f7f9fc] text-slate-700"
             onClick={onClose}
             type="button"
           >

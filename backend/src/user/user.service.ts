@@ -25,43 +25,33 @@ export class UserService implements OnModuleInit {
       return;
     }
 
-    const defaultUsers: CreateUserDto[] = [
-      {
-        name: process.env.DEFAULT_MANAGER_NAME ?? 'Manager User',
-        email: process.env.DEFAULT_MANAGER_EMAIL ?? 'manager@teamlogger.com',
-        password: process.env.DEFAULT_MANAGER_PASSWORD ?? '',
-        role: Role.Manager,
-      },
-    ];
-
-    for (const user of defaultUsers) {
-      await this.create(user);
-    }
+    await this.create({
+      name: process.env.DEFAULT_MANAGER_NAME ?? 'Manager User',
+      email: process.env.DEFAULT_MANAGER_EMAIL ?? 'manager@teamlogger.com',
+      password: process.env.DEFAULT_MANAGER_PASSWORD ?? '',
+      role: Role.Manager,
+    });
   }
 
   async create(createUserDto: CreateUserDto) {
-    const existingUser = await this.userModel.findOne({
-      email: createUserDto.email.toLowerCase(),
-    });
+    const email = createUserDto.email.toLowerCase();
+    const existingUser = await this.userModel.findOne({ email });
 
     if (existingUser) {
       throw new ConflictException('Email already exists');
     }
 
     const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
+
     return this.userModel.create({
       ...createUserDto,
-      email: createUserDto.email.toLowerCase(),
+      email,
       password: hashedPassword,
     });
   }
 
   findAll() {
-    return this.userModel
-      .find()
-      .select('-password')
-      .sort({ name: 1 })
-      .lean();
+    return this.userModel.find().select('-password').sort({ name: 1 }).lean();
   }
 
   findByEmail(email: string) {

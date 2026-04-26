@@ -1,16 +1,8 @@
-import {
-  IsDateString,
-  IsMongoId,
-  IsNumber,
-  IsOptional,
-  IsString,
-  Max,
-  Min,
-} from 'class-validator';
+import { IsDateString, IsMongoId, IsNumber, IsOptional, IsString, Max, Min,} from 'class-validator';
 
 export class CreateLogDto {
   @IsDateString()
-  date: string;
+  date : string;
 
   @IsString()
   workDescription: string;
