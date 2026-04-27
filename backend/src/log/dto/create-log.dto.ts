@@ -1,8 +1,8 @@
-import { IsDateString, IsMongoId, IsNumber, IsOptional, IsString, Max, Min,} from 'class-validator';
+import { IsDateString, IsNumber, IsString, Max, Min } from 'class-validator';
 
 export class CreateLogDto {
   @IsDateString()
-  date : string;
+  date: string;
 
   @IsString()
   workDescription: string;
@@ -11,8 +11,4 @@ export class CreateLogDto {
   @Min(0.5)
   @Max(24)
   hoursWorked: number;
-
-  @IsOptional()
-  @IsMongoId()
-  userId?: string;
 }

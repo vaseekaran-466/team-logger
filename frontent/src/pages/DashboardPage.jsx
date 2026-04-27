@@ -33,15 +33,15 @@ export function DashboardPage() {
   const { user } = useAppSelector((state) => state.auth);
   const logsState = useAppSelector((state) => state.logs);
   const usersState = useAppSelector((state) => state.users);
-  const [userSearch, setUserSearch] = useState('');
+  const [selectedUserId, setSelectedUserId] = useState(logsState.filters.userId ?? '');
   const [startDate, setStartDate] = useState(logsState.filters.startDate ?? '');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingLog, setEditingLog] = useState(null);
   const role = user?.role;
   const isManager = role === 'manager';
   const isUser = role === 'employee';
-  const canCreateLogs = isManager;
-  const canManageLog = (log) => isManager || log.user?._id === user.id || log.user?.id === user.id;
+  const canCreateLogs = isUser;
+  const canManageLog = (log) => log.user?._id === user.id || log.user?.id === user.id;
   const panelLabel = isManager ? 'Manager Dashboard' : isUser ? 'Employee Dashboard' : 'Log Viewer';
   const today = new Date();
 
@@ -57,19 +57,7 @@ export function DashboardPage() {
     () => logsState.items.reduce((total, log) => total + Number(log.hoursWorked || 0), 0),
     [logsState.items],
   );
-
-  const userSearchTerm = userSearch.trim().toLowerCase();
-  const displayedLogs = useMemo(() => {
-    if (!isManager || !userSearchTerm) {
-      return logsState.items;
-    }
-
-    return logsState.items.filter((log) => {
-      const name = (log.user?.name ?? '').toLowerCase();
-      const email = (log.user?.email ?? '').toLowerCase();
-      return name.includes(userSearchTerm) || email.includes(userSearchTerm);
-    });
-  }, [isManager, logsState.items, userSearchTerm]);
+  const displayedLogs = logsState.items;
 
   const getUserId = (item) => item?._id ?? item?.id ?? '';
   const getUserLabel = (item) => (item?.email ? `${item.name} (${item.email})` : item?.name ?? '');
@@ -106,17 +94,19 @@ export function DashboardPage() {
     dispatch(
       logActions.fetchLogsRequest({
         ...logsState.filters,
+        userId: isManager ? selectedUserId : '',
         startDate,
       }),
     );
   };
 
   const clearFilters = () => {
-    setUserSearch('');
+    setSelectedUserId('');
     setStartDate('');
     dispatch(
       logActions.fetchLogsRequest({
         ...logsState.filters,
+        userId: '',
         startDate: '',
       }),
     );
@@ -165,11 +155,7 @@ export function DashboardPage() {
     : defaultLogValues;
 
   const modalLogSchema =
-    isManager && !editingLog
-      ? logSchema.shape({
-          userId: Yup.string().required('User is required'),
-        })
-      : logSchema;
+    logSchema;
 
   return (
     <div className="dashboard-shell">
@@ -234,17 +220,22 @@ export function DashboardPage() {
           >
             {isManager ? (
               <div className="dashboard-filter-field">
-                <label className="dashboard-filter-label" htmlFor="userSearch">
-                  User Search
+                <label className="dashboard-filter-label" htmlFor="selectedUserId">
+                  Filter User
                 </label>
-                <input
-                  id="userSearch"
-                  type="text"
+                <select
+                  id="selectedUserId"
                   className="dashboard-filter-input"
-                  placeholder="Search by name or email"
-                  value={userSearch}
-                  onChange={(event) => setUserSearch(event.target.value)}
-                />
+                  value={selectedUserId}
+                  onChange={(event) => setSelectedUserId(event.target.value)}
+                >
+                  <option value="">All users</option>
+                  {usersState.items.map((item) => (
+                    <option key={getUserId(item)} value={getUserId(item)}>
+                      {getUserLabel(item)}
+                    </option>
+                  ))}
+                </select>
               </div>
             ) : null}
 
@@ -290,7 +281,7 @@ export function DashboardPage() {
             {logsState.loading ? <span className="section-copy">Refreshing data...</span> : null}
           </div>
 
-          <Table
+            <Table
             data={displayedLogs}
             emptyMessage="No logs found for the selected filters."
             columns={[
@@ -364,7 +355,6 @@ export function DashboardPage() {
               date: values.date,
               workDescription: values.workDescription,
               hoursWorked: Number(values.hoursWorked),
-              ...(isManager && !editingLog ? { userId: values.userId } : {}),
             };
 
             dispatch(
@@ -377,17 +367,6 @@ export function DashboardPage() {
           }}
         >
           <Form className="grid gap-[18px]">
-            {isManager && !editingLog ? (
-              <InputField label="Assign User" name="userId" as="select">
-                <option value="">Select a user</option>
-                {usersState.items.map((item) => (
-                  <option key={getUserId(item)} value={getUserId(item)}>
-                    {getUserLabel(item)}
-                  </option>
-                ))}
-              </InputField>
-            ) : null}
-
             <InputField label="Date" name="date" type="date" />
             <InputField label="Hours Worked" name="hoursWorked" type="number" />
             <TextareaField

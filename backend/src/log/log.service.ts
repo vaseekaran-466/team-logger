@@ -8,7 +8,6 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Role } from '../common/enums/role.enum';
 import { CurrentUserData } from '../common/interfaces/request.interfaces';
-import { UserService } from '../user/user.service';
 import { CreateLogDto } from './dto/create-log.dto';
 import { FilterLogDto } from './dto/filter-log.dto';
 import { UpdateLogDto } from './dto/update-log.dto';
@@ -16,10 +15,7 @@ import { Log, LogDocument } from './schema/log.schema';
 
 @Injectable()
 export class LogService {
-  constructor(
-    @InjectModel(Log.name) private readonly logModel: Model<LogDocument>,
-    private readonly userService: UserService,
-  ) {}
+  constructor(@InjectModel(Log.name) private readonly logModel: Model<LogDocument>) {}
 
   async create(createLogDto: CreateLogDto, currentUser: CurrentUserData) {
     if (!currentUser?.sub) {
@@ -28,22 +24,11 @@ export class LogService {
       );
     }
 
-    let userId = currentUser.sub;
-
-    if (currentUser.role === Role.Manager && createLogDto.userId) {
-      const selectedUser = await this.userService.findById(createLogDto.userId);
-
-      if (!selectedUser) {
-        throw new NotFoundException('User not found');
-      }
-      userId = createLogDto.userId;
-    }
-
     return this.logModel.create({
       workDescription: createLogDto.workDescription,
       hoursWorked: createLogDto.hoursWorked,
       date: new Date(createLogDto.date),
-      user: userId,
+      user: currentUser.sub,
     });
   }
 
@@ -102,10 +87,7 @@ export class LogService {
       throw new NotFoundException('Log not found');
     }
 
-    if (
-      currentUser.role !== Role.Manager &&
-      existingLog.user.toString() !== currentUser.sub
-    ) {
+    if (existingLog.user.toString() !== currentUser.sub) {
       throw new ForbiddenException('You can only manage your own logs');
     }
 
@@ -138,10 +120,7 @@ export class LogService {
       throw new NotFoundException('Log not found');
     }
 
-    if (
-      currentUser.role !== Role.Manager &&
-      existingLog.user.toString() !== currentUser.sub
-    ) {
+    if (existingLog.user.toString() !== currentUser.sub) {
       throw new ForbiddenException('You can only manage your own logs');
     }
 
